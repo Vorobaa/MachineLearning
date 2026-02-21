@@ -44,9 +44,87 @@ splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=20)
 docs = splitter.create_documents([faq_text])
 
 embeddings = OpenAIEmbeddings()
-vector_store = FAISS(
-    embedding_function=embeddings,
-    index=index,
-    docstore=InMemoryDocstore(),
-    index_to_docstore_id={},
+# vector_store = FAISS(
+#     embedding_function=embeddings,
+#     index=index,
+#     docstore=InMemoryDocstore(),
+#     index_to_docstore_id={},
+# )
+vector_store = FAISS.from_documents(docs, embeddings)
+
+@tool
+def search_faq(query: str) -> str:
+    """Питання/відповідь Faq"""
+    try:
+        # result = vector_store.search(query)
+        result = vector_store.similarity_search(query, k=1)
+        if not result:
+            return "Нічого не знайдемо у FAQ"
+        return result[0].page_content
+
+    except Exception as e:
+        return f"Error: {e}"
+
+@tool
+def weather_api(city: str) -> str:
+    """Відповідає про погоду"""
+    data = {
+        "Kharkiv": "Сонячно, 0..+2C",
+        "Kyiv": "Хмарно, -1..+1C, вітряно",
+        "Lviv": "Дощ, +2..+3C"
+    }
+    return data.get(
+        city,
+        f"Немає даних для введеного містаб спробуйте: {", ".join(list(data.keys()))}"
+    )
+
+
+
+# Створення агента
+from langchain.agents import create_agent
+
+
+tools = [safe_calculate, search_faq, weather_api]
+# If desired, specify custom instructions
+prompt = (
+    "You have access to a tool that retrieves context from a blog post. "
+    "Use the tool to help answer user queries."
+    "Use weather_api tool to retrieve weather information."
+    "Use search_faq tool to retrieve the most relevant FAQ/blog content using semantic search."
+    "The search_faq tool returns relevant context text."
+    "Use that context to generate the final answer."
+    "If the tool returns Нічого не знайдемо у FAQ, tell the user that the information was not found."
+    "Do NOT invent information that is not in the retrieved content."
+    "If the question does not require FAQ data, answer normally."
 )
+# agent = create_agent(model, tools, system_prompt=prompt)
+agent = create_agent(
+    model = llm,
+    tools = tools,
+    system_prompt = prompt,
+    debug = True
+)
+
+def get_output(result: dict) -> str:
+    messages = result.get("messages", [])
+    for msg in reversed(messages):
+        content = getattr(msg, "content", None)
+        tool_calls = getattr(msg, "tool_calls", None) or []
+        if content and not tool_calls:
+            if isinstance(content, str):
+                return content
+            if isinstance(content, list):
+                return "".join(
+                    c.get("text", str(c)) if isinstance(c, dict) else str(c) for c in content
+
+                )
+    return ""
+
+if __name__ == "__main__":
+    print("\n=== Калькулятор ===")
+    result = agent.invoke({"messages": [{"role": "user", "content": "Обчисли: (2+3)*4-5"}]})
+    print(get_output(result))
+
+    print("\n=== Погода (API муляж) ===")
+    result = agent.invoke({"messages": [{"role": "user", "content": "Яка погода у Kharkiv"}]})
+    print(get_output(result))
