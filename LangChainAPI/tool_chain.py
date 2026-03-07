@@ -7,7 +7,7 @@ from openai import embeddings
 
 load_dotenv()
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 @tool(
     "calculator",
@@ -67,7 +67,7 @@ def search_faq(query: str) -> str:
 
 @tool
 def weather_api(city: str) -> str:
-    """Відповідає про погоду"""
+    """Відповідає про погоду """
     data = {
         "Kharkiv": "Сонячно, 0..+2C",
         "Kyiv": "Хмарно, -1..+1C, вітряно",
