@@ -5,25 +5,28 @@ from google import genai
 
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GMAIL_EMAIL = os.getenv("GMAIL_EMAIL")
-GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+GMAIL_EMAIL = os.getenv('GMAIL_EMAIL')
+GMAIL_APP_PASSWORD = os.getenv('GMAIL_APP_PASSWORD')
 
 client = genai.Client(api_key=GEMINI_API_KEY)
+
 
 # model = genai.GenerativeModel('gemini-2.5-flash')
 
 def connect_to_gmail():
     try:
-        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+        mail = imaplib.IMAP4_SSL('imap.gmail.com')
         mail.login(GMAIL_EMAIL, GMAIL_APP_PASSWORD)
-        print("Connected to Gmail")
+        print('Connected to Gmail')
         return mail
     except Exception as e:
         print(f"Error connecting to Gmail: {e}")
         return None
+
 
 def decode_email_subject(subject):
     if not subject:
@@ -45,6 +48,7 @@ def decode_email_subject(subject):
         print(f"Error decoding subject: {e}")
         return subject if isinstance(subject, str) else "Error decoding subject"
 
+
 def get_email_body(msg):
     body = ""
     if msg.is_multipart():
@@ -55,26 +59,33 @@ def get_email_body(msg):
                     body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
                     break
                 except:
-                    body = "Error decoding part"
+                    body = "Can`t decode part"
+
+
+        # print(body)
     else:
         try:
             body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
         except:
-            body = "Cannot decode body"
-    print(body)
+            body = "Can`t decode"
+        # print(body)
+    if not body:
+        body = "No text in body"
     return body
+
 
 def get_emails(mail, max_emails=5):
     try:
-        mail.select("INBOX") # "SPAM"
-        status, messages = mail.search(None, "ALL") # "SEEN", "UNSEEN"
+        mail.select("INBOX")  # "SPAM"
+        status, messages = mail.search(None, "ALL")  # "SEEN", "UNSEEN"
         email_ids = messages[0].split()
-        email_ids = email_ids[-max_emails:] # -5, -4, -3, -2, -1
+        email_ids = email_ids[-max_emails:]  # -5, -4, -3, -2, -1
         # Ex. 100 -> email_ids = [96, 97, 98, 99, 100]
+        # Якщо всього 100 листів, то 100 - найновіший
 
         emails = []
 
-        for email_id in reversed(email_ids): # [100, 99, 98, 97, 96]
+        for email_id in reversed(email_ids):  # [100, 99, 98, 97, 96]
             status, msg_data = mail.fetch(email_id, "(RFC822)")
             for response_part in msg_data:
                 if isinstance(response_part, tuple):
@@ -95,7 +106,8 @@ def get_emails(mail, max_emails=5):
     except Exception as e:
         print(f"Error fetching emails: {e}")
         return []
-    
+
+
 def analyze_emails_with_ai(emails: list):
     if not emails:
         print("Листів немає")
@@ -131,15 +143,17 @@ def analyze_emails_with_ai(emails: list):
                 contents=prompt
             )
             print(f"\nAnalys AI:\n{response.text}")
-        except:  # HW
-            print("ERROR")
+        except Exception as i:  # HW
+            print("ERROR with Ai")
+            print(i)
+
 
 def main():
     mail = connect_to_gmail()
     if not mail:
-        print("Error connecting to Gmail")
+        print("Something wrong")
         return
-    print("Connected to Gmail")
+    print("Getting emails")
     emails = get_emails(mail, max_emails=5)
 
     mail.close()
@@ -147,7 +161,8 @@ def main():
 
     # print(emails)
     analyze_emails_with_ai(emails)
-    print("Готово")
+    print("Готово!!")
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     main()
